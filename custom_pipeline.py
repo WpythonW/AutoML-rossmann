@@ -28,6 +28,7 @@ from lightautoml.automl.base import AutoML
 from lightautoml.reader.base import PandasToPandasReader
 from lightautoml.pipelines.ml.base import MLPipeline
 from lightautoml.ml_algo.boost_lgbm import BoostLGBM
+from lightautoml.ml_algo.boost_cb import BoostCB
 from lightautoml.ml_algo.linear_sklearn import LinearLBFGS
 from lightautoml.ml_algo.tuning.optuna import OptunaTuner
 from lightautoml.report import ReportDeco
@@ -36,28 +37,31 @@ from lightautoml.tasks import Task
 import pandas as pd
 
 RANDOM_STATE = 42
-
-train = pd.read_csv('example_train.csv')
+N_FOLDS = 5
 
 roles = {
-    'Store': CategoryRole(),
-    'Date': DatetimeRole(base_date=True, seasonality=['year', 'month', 'week', 'dayofweek']),
-    'Sales': TargetRole(),
-    'Promo': NumericRole(),
-    'StateHoliday': CategoryRole(),
-    'SchoolHoliday': NumericRole(),
-    'StoreType': CategoryRole(),
-    'Assortment': CategoryRole(),
-    'CompetitionDistance': NumericRole(),
-    'CompetitionOpenSinceMonth': NumericRole(),
-    'CompetitionOpenSinceYear': NumericRole(),
-    'Promo2': NumericRole(),
-    'Promo2SinceWeek': NumericRole(),
-    'Promo2SinceYear': NumericRole(),
-    'PromoInterval': CategoryRole(),
-    'id_2': GroupRole()
+    'target': 'Sales',
+    'group': 'id_2',
+    NumericRole(): [
+        'Promo', 'SchoolHoliday', 'CompetitionDistance',
+        'CompetitionOpenSinceMonth', 'CompetitionOpenSinceYear',
+        'Promo2', 'Promo2SinceWeek', 'Promo2SinceYear'
+    ],
+    CategoryRole(): [
+        'Store', 'StateHoliday', 'StoreType', 
+        'Assortment', 'PromoInterval'
+    ],
+    DatetimeRole(base_date=True, seasonality=['year', 'month', 'week', 'dayofweek']): 'Date'
 }
 
+task = Task('reg')
+train = pd.read_csv('example_train.csv').sample(frac=0.01)
+reader = PandasToPandasReader(
+    task, 
+    cv=N_FOLDS, 
+    random_state=RANDOM_STATE,
+    advanced_roles=True
+)
 
 tr1 = SequentialTransformer([
     SequentialTransformer([
@@ -73,14 +77,9 @@ tr2 = SequentialTransformer([
         ColumnsSelector(['CompetitionDistance', 'Promo', 'SchoolHoliday', 'Promo2']),
         FillnaMean(),
         StandardScaler(),
-        PCATransformer(n_components=5)
+        #PCATransformer(n_components=5)
     ])
 ])
-
-task = Task('binary')
-
-N_FOLDS = 5
-reader = PandasToPandasReader(task, cv=N_FOLDS, random_state=RANDOM_STATE)
 
 lgbm_tuner = OptunaTuner(n_trials=20, timeout=30)
 pipeline_lgbm = MLPipeline(
@@ -88,22 +87,23 @@ pipeline_lgbm = MLPipeline(
     features_pipeline=tr1
 )
 
-pipeline_linear = MLPipeline(
-    [LinearLBFGS()],
+cb_tuner = OptunaTuner(n_trials=20, timeout=30)
+pipeline_cb = MLPipeline(
+    [(BoostCB(), cb_tuner)],
     features_pipeline=tr2
 )
 
 automl = AutoML(
     reader,
     [
-        [pipeline_lgbm, pipeline_linear]  # уровень 1
+        [pipeline_lgbm, pipeline_cb]  # уровень 1
     ]
 )
 
-rd = ReportDeco(output_path='reports/custom_report.html')
-automl_reported = rd(automl)
+#rd = ReportDeco(output_path='reports/custom_report.html')
+#automl_reported = rd(automl)
 
-oof_pred = automl_reported.fit_predict(
+oof_pred = automl.fit_predict(
     train,
     roles=roles,
     verbose=4
