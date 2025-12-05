@@ -32,6 +32,7 @@ from lightautoml.ml_algo.boost_cb import BoostCB
 from lightautoml.ml_algo.linear_sklearn import LinearLBFGS
 from lightautoml.ml_algo.tuning.optuna import OptunaTuner
 from lightautoml.report import ReportDeco
+from lightautoml.pipelines.features.lgb_pipeline import LGBSimpleFeatures
 from lightautoml.tasks import Task
 
 import pandas as pd
@@ -93,10 +94,17 @@ pipeline_cb = MLPipeline(
     features_pipeline=tr2
 )
 
+cb2_tuner = OptunaTuner(n_trials=20, timeout=30)
+pipeline_cb2 = MLPipeline(
+    [(BoostCB(), cb2_tuner)],
+    features_pipeline=LGBSimpleFeatures()
+)
+
 automl = AutoML(
     reader,
     [
-        [pipeline_lgbm, pipeline_cb]  # уровень 1
+        [pipeline_lgbm, pipeline_cb],  # уровень 1
+        [pipeline_cb2]
     ]
 )
 
