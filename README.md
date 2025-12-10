@@ -1,90 +1,72 @@
-# Rossmann Store Sales Prediction - AutoML Approach
+# Rossmann Store Sales Prediction
 
-This project aims to predict 6 weeks of daily sales for Rossmann drug stores using historical sales data. The solution leverages AutoML techniques (LightAutoML) and robust validation strategies to ensure accurate forecasts.
+Прогнозирование продаж для сети магазинов Rossmann с использованием LightGBM и ручного подбора фичей.
 
-## Project Structure
+## Результаты
 
-*   `src/`: Source code for training and evaluation.
-    *   `run_baselines.py`: Main script to run LightAutoML baselines.
-*   `data/`: Dataset files (train, test, store, etc.).
-*   `eda.ipynb`: Exploratory Data Analysis notebook containing visualizations and insights.
+Собственное решение с ручным инжинирингом фичей побило LightAutoML бейзлайны на 12%:
+- **LAMA baseline**: 0.139 RMSPE (private)
+- **Мое решение**: 0.124 RMSPE (private)
 
-## Installation and Usage
+![Kaggle Submit](src/submitsScreen.png)
 
-1.  **Install Dependencies:**
-    ```bash
-    pip install -r requirements.txt
-    ```
+## Структура репозитория
 
-2.  **Run Training:**
-    To train the LightAutoML models and generate submissions:
-    ```bash
-    python src/run_baselines.py
-    ```
+```
+.
+├── Rossman full research.ipynb  # основной ноутбук с полным исследованием
+├── data/                        # исходные данные Kaggle
+│   ├── train.csv
+│   ├── test.csv
+│   ├── store.csv
+│   └── sample_submission.csv
+├── submissions/                 # файлы сабмитов на Kaggle
+│   ├── lightgbm_base.csv
+│   ├── lightgbm_target_encoding.csv
+│   └── lama_*.csv              # бейзлайны LightAutoML
+└── src/
+    ├── submitsScreen.png       # скриншот метрик с Kaggle
+    └── timeSriesPrediction.png # пример прогноза для 5 магазинов
+```
 
-## EDA Insights
+## Основной ноутбук
 
-Key findings from the Exploratory Data Analysis:
-*   **Promo Impact:** Promotions are the most significant driver of sales.
-*   **Seasonality:** Strong weekly patterns (closed Sundays) and annual peaks in December.
-*   **Competition:** The distance to competitors has a complex, non-linear relationship with sales.
-*   **Store Types:** Different store types exhibit distinct sales behaviors.
+`Rossman full research.ipynb` содержит:
+1. **EDA** — разведочный анализ данных, выявление паттернов и аномалий
+2. **Feature Engineering** — создание 50+ признаков на основе гипотез из EDA
+3. **Гипотезы** — 16 гипотез о влиянии признаков на продажи (12 подтвердились, 4 провалились)
+4. **Бейзлайны** — 3 модели LightAutoML для сравнения
+5. **Мои модели** — 2 LightGBM модели с разными наборами признаков
+6. **Итоговые выводы** — анализ важности признаков и эффективности моделей
 
-## Approach
+## Ключевые находки
 
-*   **Model:** LightAutoML (LAMA) for automated feature engineering and model selection.
-*   **Validation:** Time Series Split is used to mimic the production scenario and avoid look-ahead bias.
-*   **Metric:** Root Mean Square Percentage Error (RMSPE).
+**Топ-5 признаков**:
+- `StoreDowMean` (755k importance) — средние продажи по магазину и дню недели
+- `MonthRatio` (131k) — отклонение магазина от нормы типа в текущем месяце
+- `PromoDow` (114k) — interaction промо и дня недели
+- `WeekDowMean` (58k) — микросезонность конкретных недель года
+- `Store` (74k) — уникальность каждого магазина
 
----
+**Что не работает**:
+- Duration признаки конкуренции (CompetitionOpen, NewCompetition)
+- Разложение PromoInterval на отдельные месяцы
+- Бинарные флаги комбинаций (DangerousComp, SafeComp)
+- Лаги таргета и специализация моделей по типам магазинов
 
-## Problem Description
+## Установка
 
-Rossmann operates over 3,000 drug stores in 7 European countries. Currently, Rossmann store managers are tasked with predicting their daily sales for up to six weeks in advance. Store sales are influenced by many factors, including promotions, competition, school and state holidays, seasonality, and locality. With thousands of individual managers predicting sales based on their unique circumstances, the accuracy of results can be quite varied.
+```bash
+uv sync
+```
 
-In their first Kaggle competition, Rossmann is challenging you to predict 6 weeks of daily sales for 1,115 stores located across Germany. Reliable sales forecasts enable store managers to create effective staff schedules that increase productivity and motivation. By helping Rossmann create a robust prediction model, you will help store managers stay focused on what’s most important to them: their customers and their teams! 
+## Данные
 
+Датасет Rossmann Store Sales с Kaggle:
+- 1.017M записей продаж за 2013-2015
+- 1115 магазинов
+- 22 исходных признака
 
-Submissions are evaluated on the Root Mean Square Percentage Error (RMSPE). The RMSPE is calculated as
+## Примеры предсказаний для отдельных магазинов на валидации
 
-RMSPE = sqrt(1/n * sum((y_i - yhat_i)/y_i)^2)
-where y_i denotes the sales of a single store on a single day and yhat_i denotes the corresponding prediction. Any day and store with 0 sales is ignored in scoring.
-
-## Submission File
-The file should contain a header and have the following format:
-
-Id,Sales
-1,0
-2,0
-3,0
-etc.
-
-
-## Dataset Description:
-Datasets in data folder!
-You are provided with historical sales data for 1,115 Rossmann stores. The task is to forecast the "Sales" column for the test set. Note that some stores in the dataset were temporarily closed for refurbishment.
-
-### Files
-*   `train.csv` - historical data including Sales
-*   `test.csv` - historical data excluding Sales
-*   `sample_submission.csv` - a sample submission file in the correct format
-*   `store.csv` - supplemental information about the stores
-
-### Data fields
-Most of the fields are self-explanatory. The following are descriptions for those that aren't.
-
-*   `Id` - an Id that represents a (Store, Date) duple within the test set
-*   `Store` - a unique Id for each store
-*   `Sales` - the turnover for any given day (this is what you are predicting)
-*   `Customers` - the number of customers on a given day
-*   `Open` - an indicator for whether the store was open: 0 = closed, 1 = open
-*   `StateHoliday` - indicates a state holiday. Normally all stores, with few exceptions, are closed on state holidays. Note that all schools are closed on public holidays and weekends. a = public holiday, b = Easter holiday, c = Christmas, 0 = None
-*   `SchoolHoliday` - indicates if the (Store, Date) was affected by the closure of public schools
-*   `StoreType` - differentiates between 4 different store models: a, b, c, d
-*   `Assortment` - describes an assortment level: a = basic, b = extra, c = extended
-*   `CompetitionDistance` - distance in meters to the nearest competitor store
-*   `CompetitionOpenSince[Month/Year]` - gives the approximate year and month of the time the nearest competitor was opened
-*   `Promo` - indicates whether a store is running a promo on that day
-*   `Promo2` - Promo2 is a continuing and consecutive promotion for some stores: 0 = store is not participating, 1 = store is participating
-*   `Promo2Since[Year/Week]` - describes the year and calendar week when the store started participating in Promo2
-*   `PromoInterval` - describes the consecutive intervals Promo2 is started, naming the months the promotion is started anew. E.g. "Feb,May,Aug,Nov" means each round starts in February, May, August, November of any given year for that store
+![Kaggle Submit](src/timeSeriesPrediction.png)
